@@ -1,0 +1,25 @@
+# Terragrunt
+.terragrunt-cache/
+.terragrunt-stack/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Значения переменных часто содержат секреты
+*.tfvars
+*.tfvars.json
+
+# ОС
+.DS_Store

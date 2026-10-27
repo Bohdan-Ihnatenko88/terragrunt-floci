@@ -1,0 +1,42 @@
+services:
+  floci-aws:
+    image: floci/floci:latest
+    container_name: floci-aws
+    ports:
+      - "4566:4566"
+    environment:
+      - FLOCI_HOSTNAME=floci-aws
+      - FLOCI_BASE_URL=http://floci-aws:4566
+      - FLOCI_STORAGE_MODE=hybrid
+    volumes:
+      - floci_data_aws:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  floci-gcp:
+    image: floci/floci-gcp:latest
+    container_name: floci-gcp
+    ports:
+      - "4588:4588"
+    environment:
+      - FLOCI_HOSTNAME=floci-gcp
+      - FLOCI_BASE_URL=http://floci-gcp:4588
+      - FLOCI_STORAGE_MODE=hybrid
+    volumes:
+      - floci_data_gcp:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  floci-ui:
+    image: floci/floci-ui:latest
+    container_name: floci-ui
+    ports:
+      - "4500:4500"
+    environment:
+      - FLOCI_ENDPOINT=http://floci-aws:4566
+      - FLOCI_GCP_ENDPOINT=http://floci-gcp:4588
+    depends_on:
+      - floci-aws
+      - floci-gcp
+
+volumes:
+  floci_data_aws:
+  floci_data_gcp:

@@ -1,0 +1,17 @@
+.terragrunt-stack/
+.terragrunt-cache/
+.state/
+.terraform/
+.terraform.lock.hcl
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+
+# ОС
+.DS_Store

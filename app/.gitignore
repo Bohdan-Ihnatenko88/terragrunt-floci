@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Виртуальные окружения
+.venv/
+venv/
+
+# Кэши инструментов
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Локальные переменные окружения
+.env
+.env.*
+
+# Случайный state, если terraform запустили в этой папке
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# ОС
+.DS_Store
