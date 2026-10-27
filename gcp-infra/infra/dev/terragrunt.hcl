@@ -1,5 +1,5 @@
 terraform {
-  source = "../../../infra-modules"
+  source = "../../infra-modules"
 }
 
 include "root" {

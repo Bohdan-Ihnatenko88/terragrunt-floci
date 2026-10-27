@@ -8,19 +8,19 @@
 Пайплайн обработки заказов от партнёров:
 
 ```
-партнёр ── CSV ──▶ GCS  floci-local-uploads/incoming/
+партнёр ── CSV ──▶ GCS  floci-local-dev-uploads/incoming/
                       │  (bucket notification, OBJECT_FINALIZE)
                       ▼
-                  Pub/Sub  uploads ──▶ worker
-                                         ├─ Secret Manager   partner-api-key  → HMAC-подпись заказа
-                                         ├─ Cloud KMS        orders/customer-pii → шифрует e-mail
+                  Pub/Sub  dev-uploads ──▶ worker
+                                         ├─ Secret Manager   dev-partner-api-key  → HMAC-подпись заказа
+                                         ├─ Cloud KMS        dev-orders/customer-pii → шифрует e-mail
                                          ├─ Firestore        orders/{id}      → операционные данные
-                                         ├─ BigQuery         orders.orders    → аналитика без PII
+                                         ├─ BigQuery         dev_orders.orders → аналитика без PII
                                          ├─ Cloud Tasks      receipts         → «отправить чек» по оплаченным
                                          ├─ Cloud Logging    orders-worker    → журнал обработки
-                                         └─ GCS              floci-local-processed/done/ ← перенос файла
+                                         └─ GCS              floci-local-dev-processed/done/ ← перенос файла
 
-Cloud Scheduler (каждую минуту) ──▶ Pub/Sub report-requests ──▶ worker ──▶ отчёт в Cloud Logging
+Cloud Scheduler (каждую минуту) ──▶ Pub/Sub dev-report-requests ──▶ worker ──▶ отчёт в Cloud Logging
 ```
 
 Кроме того Terraform для галочки создаёт **Cloud Run** (nginx, раздаёт страницу из GCS),
@@ -55,9 +55,9 @@ Cloud Scheduler (каждую минуту) ──▶ Pub/Sub report-requests �
 
 ```bash
 # 1. Инфраструктура (state хранится в бакете floci-local-tfstate на floci)
-cd gcp-infra/infra/dev/orders-lab
+cd gcp-infra/infra/dev
 terragrunt apply                 # with_compute = false в terragrunt.hcl, если Cloud Run / SQL не нужны
-cd ../../../..
+cd ../../..
 
 # 2. Приложение
 python -m venv .venv && source .venv/bin/activate
@@ -115,24 +115,24 @@ gcloud config set api_endpoint_overrides/serviceusage   http://localhost:4588/
 
 **1. Посмотреть, что лежит в бакетах**
 ```bash
-gcloud storage ls gs://floci-local-uploads/
-gcloud storage ls gs://floci-local-processed/done/
-gcloud storage cat gs://floci-local-processed/done/<файл>.csv | head
+gcloud storage ls gs://floci-local-dev-uploads/
+gcloud storage ls gs://floci-local-dev-processed/done/
+gcloud storage cat gs://floci-local-dev-processed/done/<файл>.csv | head
 ```
 
 **2. Загрузить файл руками, как партнёр**
 ```bash
 printf 'order_id,email,country,status,amount\nmanual0001,me@example.com,ES,paid,42.00\n' > /tmp/o.csv
-gcloud storage cp /tmp/o.csv gs://floci-local-uploads/incoming/manual.csv
+gcloud storage cp /tmp/o.csv gs://floci-local-dev-uploads/incoming/manual.csv
 # воркер подхватит его сам; затем:
 python app/lab.py reveal manual0001
 ```
 
 **3. Ротация секрета**
 ```bash
-gcloud secrets versions list partner-api-key
-printf 'pk_live_v2_rotated' | gcloud secrets versions add partner-api-key --data-file=-
-gcloud secrets versions access latest --secret=partner-api-key
+gcloud secrets versions list dev-partner-api-key
+printf 'pk_live_v2_rotated' | gcloud secrets versions add dev-partner-api-key --data-file=-
+gcloud secrets versions access latest --secret=dev-partner-api-key
 python app/lab.py reveal manual0001    # «подпись НЕ совпадает»: заказ подписан старым ключом
 ```
 В floci `versions add` может завершиться с ошибкой CRC32C, хотя версия создаётся. Это известное
@@ -141,8 +141,8 @@ python app/lab.py reveal manual0001    # «подпись НЕ совпадае�
 **4. KMS**
 ```bash
 gcloud kms keyrings list --location=us-central1
-gcloud kms keys list --keyring=orders --location=us-central1
-gcloud kms keys describe customer-pii --keyring=orders --location=us-central1
+gcloud kms keys list --keyring=dev-orders --location=us-central1
+gcloud kms keys describe customer-pii --keyring=dev-orders --location=us-central1
 ```
 `gcloud kms encrypt/decrypt` против floci не работают (проверка CRC32C). Шифрование
 проверяется через `lab.py reveal`.
@@ -176,8 +176,8 @@ mock-режиме. Затем он пробует `GROUP BY country`, а это 
 ошибку `invalidQuery`.
 
 **9. Terraform-цикл, как в жизни**
-Добавь в `gcp-infra/infra-modules/main.tf` новый топик `orders-dlq` и подпиши `uploads-worker` на него как
-dead-letter, затем `terragrunt plan` / `apply` из `gcp-infra/infra/dev/orders-lab`. Потом
+Добавь в `gcp-infra/infra-modules/main.tf` новый топик `orders-dlq` и подпиши `dev-uploads-worker` на него как
+dead-letter, затем `terragrunt plan` / `apply` из `gcp-infra/infra/dev`. Потом
 `terragrunt destroy` и заново `apply`:
 убедись, что `bootstrap` идемпотентен.
 

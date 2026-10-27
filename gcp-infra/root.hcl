@@ -5,6 +5,15 @@ locals {
   project      = "floci-local"           # проект по умолчанию у floci, его же показывает floci-ui
   region       = "us-central1"
   state_bucket = "${local.project}-tfstate"
+
+  # Окружение берётся из infra/<env>/env.hcl. Сначала ищем рядом с terragrunt.hcl юнита
+  # (find_in_parent_folders эту папку пропускает), потом выше по дереву.
+  env_file = fileexists("${get_terragrunt_dir()}/env.hcl") ? "${get_terragrunt_dir()}/env.hcl" : find_in_parent_folders("env.hcl")
+  env      = read_terragrunt_config(local.env_file).locals.env
+
+  # Путь state внутри бакета: <env>/<юнит>/default.tfstate.
+  # infra/dev → dev, infra/dev/network → dev/network
+  state_prefix = trimprefix(path_relative_to_include(), "infra/")
 }
 
 # ── Provider: google, каждый API перенаправлен на floci ──────────────────────
@@ -49,7 +58,7 @@ generate "backend" {
 terraform {
   backend "gcs" {
     bucket                  = "${local.state_bucket}"
-    prefix                  = "${path_relative_to_include()}"
+    prefix                  = "${local.state_prefix}"
     storage_custom_endpoint = "${local.endpoint}/storage/v1/"
     access_token            = "mock-token"
   }
@@ -78,6 +87,7 @@ terraform {
 }
 
 inputs = {
+  env     = local.env
   project = local.project
   region  = local.region
 }

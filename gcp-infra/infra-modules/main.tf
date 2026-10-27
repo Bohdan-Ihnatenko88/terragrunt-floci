@@ -2,20 +2,20 @@
 # Приложение (app/) эти ресурсы только использует.
 
 locals {
-  labels = { app = "orders-lab", env = "local" }
+  labels = { app = "orders-lab", env = var.env }
 }
 
 # ── Сервисный аккаунт приложения ─────────────────────────────────────────────
 resource "google_service_account" "worker" {
-  account_id   = "orders-worker"
-  display_name = "Orders pipeline worker"
+  account_id   = "${var.env}-orders-worker"
+  display_name = "Orders pipeline worker (${var.env})"
 }
 
 # ── Cloud Storage ────────────────────────────────────────────────────────────
 # uploads   — сюда партнёры кладут CSV с заказами (incoming/...)
 # processed — сюда воркер переносит обработанные файлы
 resource "google_storage_bucket" "uploads" {
-  name                        = "${var.project}-uploads"
+  name                        = "${var.project}-${var.env}-uploads"
   location                    = "US"
   force_destroy               = true
   uniform_bucket_level_access = false
@@ -23,7 +23,7 @@ resource "google_storage_bucket" "uploads" {
 }
 
 resource "google_storage_bucket" "processed" {
-  name                        = "${var.project}-processed"
+  name                        = "${var.project}-${var.env}-processed"
   location                    = "US"
   force_destroy               = true
   uniform_bucket_level_access = false
@@ -41,23 +41,23 @@ resource "google_storage_bucket_object" "readme" {
 # uploads          ← события GCS (OBJECT_FINALIZE), нотификацию вешает `lab.py bootstrap`
 # report-requests  ← Cloud Scheduler раз в минуту
 resource "google_pubsub_topic" "uploads" {
-  name   = "uploads"
+  name   = "${var.env}-uploads"
   labels = local.labels
 }
 
 resource "google_pubsub_subscription" "uploads_worker" {
-  name                 = "uploads-worker"
+  name                 = "${var.env}-uploads-worker"
   topic                = google_pubsub_topic.uploads.id
   ack_deadline_seconds = 60
 }
 
 resource "google_pubsub_topic" "report_requests" {
-  name   = "report-requests"
+  name   = "${var.env}-report-requests"
   labels = local.labels
 }
 
 resource "google_pubsub_subscription" "report_worker" {
-  name                 = "report-worker"
+  name                 = "${var.env}-report-worker"
   topic                = google_pubsub_topic.report_requests.id
   ack_deadline_seconds = 30
 }
@@ -71,7 +71,7 @@ resource "google_pubsub_subscription_iam_member" "worker_uploads" {
 # ── Secret Manager ───────────────────────────────────────────────────────────
 # «Ключ партнёрского API», которым воркер подписывает заказы (HMAC).
 resource "google_secret_manager_secret" "partner_api_key" {
-  secret_id = "partner-api-key"
+  secret_id = "${var.env}-partner-api-key"
 
   replication {
     auto {}
@@ -94,7 +94,7 @@ resource "google_secret_manager_secret_iam_member" "worker_reads_key" {
 # ── Cloud KMS ────────────────────────────────────────────────────────────────
 # Шифруем e-mail клиентов перед записью в Firestore (PII не лежит в открытом виде).
 resource "google_kms_key_ring" "orders" {
-  name     = "orders"
+  name     = "${var.env}-orders"
   location = var.region
 }
 
@@ -107,8 +107,8 @@ resource "google_kms_crypto_key" "pii" {
 # ── BigQuery ─────────────────────────────────────────────────────────────────
 # Аналитика по заказам — без PII.
 resource "google_bigquery_dataset" "orders" {
-  dataset_id                 = "orders"
-  friendly_name              = "Orders analytics"
+  dataset_id                 = "${var.env}_orders" # в BigQuery допустимы только буквы, цифры и _
+  friendly_name              = "Orders analytics (${var.env})"
   location                   = "US"
   delete_contents_on_destroy = true
   labels                     = local.labels

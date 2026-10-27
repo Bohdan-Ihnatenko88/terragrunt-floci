@@ -14,7 +14,7 @@ resource "google_storage_bucket_object" "site_index" {
 
 resource "google_cloud_run_v2_service" "status_page" {
   count               = var.with_compute ? 1 : 0
-  name                = "orders-status"
+  name                = "${var.env}-orders-status"
   location            = var.region
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
@@ -63,7 +63,7 @@ resource "google_cloud_run_v2_service" "status_page" {
 
 resource "google_sql_database_instance" "orders" {
   count               = var.with_compute ? 1 : 0
-  name                = "orders-pg"
+  name                = "${var.env}-orders-pg"
   region              = var.region
   database_version    = "POSTGRES_16"
   deletion_protection = false
