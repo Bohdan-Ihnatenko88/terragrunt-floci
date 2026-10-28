@@ -1,197 +1,125 @@
-# orders-lab: GCP-проект на floci-gcp
+# floci-lab
 
-Небольшой, но «настоящий» проект: инфра на Terraform, приложение на Python, gcloud для
-ручных операций. Всё как в обычном GCP-проекте, только API отвечает floci-gcp.
+A local playground for AWS and GCP infrastructure. Nothing touches a real cloud: every API call
+goes to the floci emulators running in Docker.
 
-## Что строим
-
-Пайплайн обработки заказов от партнёров:
-
-```
-партнёр ── CSV ──▶ GCS  floci-local-dev-uploads/incoming/
-                      │  (bucket notification, OBJECT_FINALIZE)
-                      ▼
-                  Pub/Sub  dev-uploads ──▶ worker
-                                         ├─ Secret Manager   dev-partner-api-key  → HMAC-подпись заказа
-                                         ├─ Cloud KMS        dev-orders/customer-pii → шифрует e-mail
-                                         ├─ Firestore        orders/{id}      → операционные данные
-                                         ├─ BigQuery         dev_orders.orders → аналитика без PII
-                                         ├─ Cloud Tasks      receipts         → «отправить чек» по оплаченным
-                                         ├─ Cloud Logging    orders-worker    → журнал обработки
-                                         └─ GCS              floci-local-dev-processed/done/ ← перенос файла
-
-Cloud Scheduler (каждую минуту) ──▶ Pub/Sub dev-report-requests ──▶ worker ──▶ отчёт в Cloud Logging
-```
-
-Кроме того Terraform для галочки создаёт **Cloud Run** (nginx, раздаёт страницу из GCS),
-**Cloud SQL** (Postgres) и **IAM** service account, а в заданиях есть **GKE** через gcloud.
-
-| Сервис | Кто создаёт | Кто использует |
+| Folder | What it is | Talks to |
 |---|---|---|
-| Cloud Storage | Terraform | `upload`, `worker`, Cloud Run |
-| Pub/Sub | Terraform | `worker`, GCS-нотификация, Scheduler |
-| Secret Manager | Terraform | `worker`, `reveal` |
-| Cloud KMS | Terraform | `worker`, `reveal` |
-| BigQuery | Terraform | `worker`, `report` |
-| IAM | Terraform | привязки к топикам и секретам |
-| Firestore | — (default DB) | `worker`, `report`, `reveal` |
-| Cloud Tasks | `lab.py bootstrap` | `worker`, `report` |
-| Cloud Scheduler | `lab.py bootstrap` | сам стреляет в Pub/Sub |
-| Cloud Logging | — | `worker`, `report` |
-| Cloud Run, Cloud SQL | Terraform (`with_compute`) | только посмотреть |
-| GKE | gcloud (задание 6) | только посмотреть |
+| `app/` | Emulators (docker compose) and the orders worker image | — |
+| `gcp-infra/` | GCP infra for the orders pipeline, Terragrunt per environment | floci-gcp `:4588` |
+| `aws-infra/` | AWS VPC + EKS + cluster add-ons, Terragrunt per environment | floci-aws `:4566` |
+| `terragrunt/` | Terragrunt stacks example: catalog of modules, units and stacks | floci-gcp `:4588` |
 
-## Что нужно
-
-- floci-gcp доступен по HTTP (по умолчанию `http://localhost:4588`)
-- Python 3.11+, Terraform ≥ 1.6, Terragrunt ≥ 1.0
-- gcloud CLI для заданий (не обязателен)
-
-## Запуск
-
-Адрес floci, проект и регион для инфраструктуры задаются в `gcp-infra/root.hcl`.
-Если floci не на localhost, поправь `endpoint` там. Приложение читает `FLOCI_ENDPOINT`,
-а без неё ходит на `http://localhost:4588`.
+## Start the emulators
 
 ```bash
-# 1. Инфраструктура (state хранится в бакете floci-local-tfstate на floci)
-cd gcp-infra/infra/dev
-terragrunt apply                 # with_compute = false в terragrunt.hcl, если Cloud Run / SQL не нужны
-cd ../../..
-
-# 2. Приложение
-python -m venv .venv && source .venv/bin/activate
-pip install -r app/requirements.txt
 cd app
-python lab.py bootstrap          # нотификация GCS → Pub/Sub, очередь Tasks, cron в Scheduler
-python lab.py demo               # upload → worker --once → report
+docker compose up -d
 ```
 
-После `demo` открой floci-ui (`localhost:4500`): в Storage, Pub/Sub, Secret Manager,
-Cloud Scheduler, Cloud Run и Database появятся ресурсы. Firestore, KMS, BigQuery, Tasks и
-Logging в UI пока нет, их видно через `python lab.py report` и gcloud.
+| Service | Port | Purpose |
+|---|---|---|
+| floci-aws | 4566 | AWS API emulator |
+| floci-gcp | 4588 | GCP API emulator |
+| floci-ui | 4500 | Web UI for both emulators |
 
-Воркер в режиме «сервиса», пока ты поштучно загружаешь файлы:
+## app
+
+```
+docker-compose.yaml ── floci-aws, floci-gcp, floci-ui
+Dockerfile ─────────── worker image: python lab.py worker
+```
+
+The Dockerfile expects `lab.py`, `labgcp/` and `requirements.txt` next to it.
+
+## gcp-infra
+
+GCP resources for the orders pipeline: GCS buckets, Pub/Sub, Secret Manager, KMS, BigQuery,
+a service account and, optionally, Cloud Run and Cloud SQL.
+
+```
+gcp-infra/
+├── root.hcl ─────────────── floci endpoint, project, region
+│     ├─ generates provider.tf   google provider pointed at floci
+│     ├─ generates backend.tf    gcs backend: floci-local-tfstate/<env>/default.tfstate
+│     ├─ before_hook             creates the state bucket on init
+│     └─ reads infra/<env>/env.hcl → passes env to the module
+├── infra/
+│   └── dev/
+│       ├── env.hcl ──────── env = "dev"
+│       └── terragrunt.hcl ─ include root.hcl, source = infra-modules, with_compute
+└── infra-modules/ ──────── one module, every name is prefixed with env
+      main.tf      buckets, Pub/Sub, secret, KMS, BigQuery, service account
+      compute.tf   Cloud Run + Cloud SQL (with_compute)
+```
 
 ```bash
-python lab.py worker             # терминал 1
-python lab.py upload -n 50       # терминал 2, сколько угодно раз
+cd gcp-infra/infra/dev
+terragrunt plan
+terragrunt apply
 ```
 
-Раз в минуту в логе воркера будет строка `scheduled report: N paid orders`: это Cloud Scheduler
-через Pub/Sub.
+New environment: copy `infra/dev` to `infra/stage` and set `env = "stage"` in `env.hcl`.
+Resource names and the state folder change automatically.
 
-Можно запустить воркер и в k3d, как сервис в GKE (см. `k8s/worker.yaml`):
+## aws-infra
+
+An AWS network with an EKS cluster and the cluster autoscaler.
+
+```
+aws-infra/
+├── root.hcl ─────────────── provider.tf (aws → floci :4566), local state in state/
+├── infra/
+│   ├── dev/
+│   │   ├── env.hcl ──────── env = "dev"
+│   │   ├── vpc ─────────────────▶ infra-modules/vpc
+│   │   ├── eks ─────────────────▶ infra-modules/eks                 depends on vpc
+│   │   └── kubernetes-addons ───▶ infra-modules/kubernetes-addons   depends on eks
+│   └── stage/
+│       └── vpc ─────────────────▶ infra-modules/vpc
+└── infra-modules/
+      vpc                 VPC, subnets, IGW, NAT, route tables
+      eks                 cluster, node group, IAM, IRSA
+      kubernetes-addons   cluster-autoscaler (helm)
+```
 
 ```bash
-docker build -t orders-lab:dev app
-k3d image import orders-lab:dev -c <cluster>
-kubectl apply -f k8s/worker.yaml   # сначала поправь FLOCI_ENDPOINT в манифесте
+cd aws-infra/infra/dev
+terragrunt run --all plan     # vpc → eks → kubernetes-addons
+terragrunt run --all apply
 ```
 
-## Задания («как будто ты в GCP»)
+## terragrunt
 
-gcloud по умолчанию ходит в настоящий GCP. Один раз создай для него отдельную конфигурацию
-с адресами floci:
+A Terragrunt stacks example with four levels: module → unit → stack → environment.
+All environment values live in one file, `live/<env>/project.hcl`.
+
+```
+terragrunt/
+├── live/
+│   ├── root.hcl ─────────── provider.tf + local state in live/.state/, reads project.hcl
+│   └── floci-local/
+│       ├── project.hcl ──── project, region, endpoint, labels, unit values
+│       └── gcp/terragrunt.stack.hcl ─▶ stack "reporting"
+└── catalog/
+    ├── stacks/gcp/reporting ─▶ units service-account + pubsub
+    ├── units/gcp/
+    │   ├── service-account ─▶ modules/gcp/service-account
+    │   └── pubsub ──────────▶ modules/gcp/pubsub        depends on service-account
+    └── modules/gcp/
+          service-account   google_service_account
+          pubsub            topic, subscriptions, subscriber IAM
+```
 
 ```bash
-printf 'floci-fake-token' > ~/.config/gcloud/floci-token
-gcloud config configurations create floci          # создаёт и сразу активирует
-gcloud config set core/project floci-local
-gcloud config set core/disable_prompts true
-gcloud config set auth/access_token_file ~/.config/gcloud/floci-token
-gcloud config set api_endpoint_overrides/storage        http://localhost:4588/storage/v1/
-gcloud config set api_endpoint_overrides/secretmanager  http://localhost:4588/
-gcloud config set api_endpoint_overrides/cloudkms       http://localhost:4588/
-gcloud config set api_endpoint_overrides/iam            http://localhost:4588/
-gcloud config set api_endpoint_overrides/cloudscheduler http://localhost:4588/
-gcloud config set api_endpoint_overrides/container      http://localhost:4588/container/
-gcloud config set api_endpoint_overrides/serviceusage   http://localhost:4588/
+cd terragrunt/live/floci-local/gcp
+terragrunt stack generate
+terragrunt stack run plan
+terragrunt stack run apply
 ```
 
-Переключение: `gcloud config configurations activate floci` перед заданиями и
-`gcloud config configurations activate default`, чтобы вернуться в настоящий GCP.
-Всё ниже выполняется с активной конфигурацией `floci`.
+## Requirements
 
-**1. Посмотреть, что лежит в бакетах**
-```bash
-gcloud storage ls gs://floci-local-dev-uploads/
-gcloud storage ls gs://floci-local-dev-processed/done/
-gcloud storage cat gs://floci-local-dev-processed/done/<файл>.csv | head
-```
-
-**2. Загрузить файл руками, как партнёр**
-```bash
-printf 'order_id,email,country,status,amount\nmanual0001,me@example.com,ES,paid,42.00\n' > /tmp/o.csv
-gcloud storage cp /tmp/o.csv gs://floci-local-dev-uploads/incoming/manual.csv
-# воркер подхватит его сам; затем:
-python app/lab.py reveal manual0001
-```
-
-**3. Ротация секрета**
-```bash
-gcloud secrets versions list dev-partner-api-key
-printf 'pk_live_v2_rotated' | gcloud secrets versions add dev-partner-api-key --data-file=-
-gcloud secrets versions access latest --secret=dev-partner-api-key
-python app/lab.py reveal manual0001    # «подпись НЕ совпадает»: заказ подписан старым ключом
-```
-В floci `versions add` может завершиться с ошибкой CRC32C, хотя версия создаётся. Это известное
-ограничение, описано в compat-тестах.
-
-**4. KMS**
-```bash
-gcloud kms keyrings list --location=us-central1
-gcloud kms keys list --keyring=dev-orders --location=us-central1
-gcloud kms keys describe customer-pii --keyring=dev-orders --location=us-central1
-```
-`gcloud kms encrypt/decrypt` против floci не работают (проверка CRC32C). Шифрование
-проверяется через `lab.py reveal`.
-
-**5. Управление cron-задачей**
-```bash
-gcloud scheduler jobs list --location=us-central1
-gcloud scheduler jobs pause  minutely-report --location=us-central1   # отчёты в логе прекратятся
-gcloud scheduler jobs resume minutely-report --location=us-central1
-gcloud scheduler jobs run    minutely-report --location=us-central1   # выстрелить сейчас
-```
-
-**6. GKE-кластер (control plane или настоящий k3s, если floci без mock)**
-```bash
-gcloud container clusters create orders-gke --region=us-central1 --async
-gcloud container clusters list --region=us-central1
-gcloud container clusters delete orders-gke --region=us-central1 --async --quiet
-```
-
-**7. IAM и Service Usage**
-```bash
-gcloud iam service-accounts list
-gcloud iam service-accounts create reporting-bot --display-name="Reporting bot"
-gcloud services list --enabled
-```
-
-**8. BigQuery на полном SQL**
-`lab.py report` сначала делает `COUNT(*) … WHERE status = 'paid'`: этот запрос работает и в
-mock-режиме. Затем он пробует `GROUP BY country`, а это требует DuckDB-сайдкар
-(`FLOCI_GCP_SERVICES_BIGQUERY_MOCK=false` и Docker socket). В mock-режиме увидишь понятную
-ошибку `invalidQuery`.
-
-**9. Terraform-цикл, как в жизни**
-Добавь в `gcp-infra/infra-modules/main.tf` новый топик `orders-dlq` и подпиши `dev-uploads-worker` на него как
-dead-letter, затем `terragrunt plan` / `apply` из `gcp-infra/infra/dev`. Потом
-`terragrunt destroy` и заново `apply`:
-убедись, что `bootstrap` идемпотентен.
-
-## Особенности floci, которые встретились по пути
-
-- **GCS → Pub/Sub нотификации.** Штатные клиенты (Python SDK, `google_storage_notification`)
-  передают топик как `//pubsub.googleapis.com/projects/…`. floci сохраняет эту строку как есть
-  и при публикации не находит топик, так что события молча пропадают (видно только warning в
-  логах floci). Поэтому `bootstrap` создаёт нотификацию прямым REST-запросом с
-  `projects/…/topics/…`. Похоже на баг, о нём можно завести issue в floci-io/floci-gcp.
-- **Cloud Tasks** хранит задачи, но не доставляет их по HTTP. Поэтому URL
-  `receipts.invalid` никуда не ведёт, и это нормально.
-- **Pub/Sub через gcloud** не работает (у floci Pub/Sub для gcloud недоступен). Через SDK и
-  Terraform работает.
-- Сервисы без `*_EMULATOR_HOST` (KMS, Logging, Tasks, Scheduler, Secret Manager в Python)
-  подключаются через явный plaintext gRPC-канал. Как это сделано, смотри в
-  `app/labgcp/clients.py`.
+- Docker
+- Terraform ≥ 1.6
+- Terragrunt ≥ 1.0
