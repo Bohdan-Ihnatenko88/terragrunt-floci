@@ -1,5 +1,5 @@
-# УРОВЕНЬ 2 — UNIT.
-# Модуль pubsub + значения из project.hcl + выход другого юнита (e-mail сервисного аккаунта).
+# LEVEL 2 — UNIT.
+# The pubsub module + values from project.hcl + another unit's output (the service account e-mail).
 
 locals {
   catalog      = "${dirname(find_in_parent_folders("root.hcl"))}/../catalog"
@@ -16,13 +16,13 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
-# Зависимость от соседнего юнита в том же стеке. Terragrunt сначала применит
-# service-account, а потом этот юнит, и подставит его outputs.
-# Путь по умолчанию — «соседняя папка», но стек может передать свой через values.
+# Dependency on a sibling unit in the same stack. Terragrunt applies
+# service-account first, then this unit, and passes in its outputs.
+# The default path is the sibling folder, but a stack can pass its own via values.
 dependency "service_account" {
   config_path = try(values.service_account_path, "../service-account")
 
-  # Пока service-account ещё ни разу не применён, plan/validate используют заглушку.
+  # Until service-account has been applied at least once, plan/validate use this mock.
   mock_outputs = {
     member = "serviceAccount:mock@floci-local.iam.gserviceaccount.com"
   }

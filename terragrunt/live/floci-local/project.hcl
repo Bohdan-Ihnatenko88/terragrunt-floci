@@ -1,6 +1,6 @@
-# Значения ОКРУЖЕНИЯ floci-local. Это единственное место, где лежат «цифры».
-# Юниты из каталога находят этот файл сами через find_in_parent_folders("project.hcl").
-# Для второго окружения (например floci-stage/) копируешь папку и меняешь только этот файл.
+# Values for the floci-local ENVIRONMENT. This is the only place that holds concrete values.
+# Catalog units find this file on their own via find_in_parent_folders("project.hcl").
+# For a second environment (e.g. floci-stage/) copy the folder and change only this file.
 
 locals {
   project = {
@@ -14,13 +14,13 @@ locals {
     }
   }
 
-  # Читает юнит units/gcp/service-account
+  # Read by the units/gcp/service-account unit
   service_account = {
     account_id   = "reporting-bot"
     display_name = "Reporting bot (terragrunt example)"
   }
 
-  # Читает юнит units/gcp/pubsub
+  # Read by the units/gcp/pubsub unit
   pubsub = {
     topic = "reports"
     subscriptions = {

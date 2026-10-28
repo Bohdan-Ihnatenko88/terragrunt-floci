@@ -1,4 +1,4 @@
-# ОС и редакторы. Правила для отдельных инструментов лежат в .gitignore каждой папки.
+# OS and editors. Tool-specific rules live in each folder's own .gitignore.
 .DS_Store
 ._*
 Thumbs.db
@@ -6,6 +6,6 @@ Thumbs.db
 *.swp
 *~
 
-# Локальные переменные окружения и секреты
+# Local environment variables and secrets
 .env
 .env.*

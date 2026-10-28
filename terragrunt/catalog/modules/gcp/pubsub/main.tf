@@ -1,5 +1,5 @@
-# УРОВЕНЬ 1 — MODULE.
-# «Как создать топик Pub/Sub с подписками и выдать права на подписки».
+# LEVEL 1 — MODULE.
+# "How to create a Pub/Sub topic with subscriptions and grant access to them".
 
 resource "google_pubsub_topic" "this" {
   name   = var.topic
@@ -15,7 +15,7 @@ resource "google_pubsub_subscription" "this" {
   labels               = var.labels
 }
 
-# Каждому участнику из var.subscribers — роль subscriber на каждую подписку.
+# Every member in var.subscribers gets the subscriber role on every subscription.
 resource "google_pubsub_subscription_iam_member" "subscriber" {
   for_each = {
     for pair in setproduct(keys(var.subscriptions), var.subscribers) :

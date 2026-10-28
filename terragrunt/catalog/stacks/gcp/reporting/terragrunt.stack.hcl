@@ -1,7 +1,7 @@
-# УРОВЕНЬ 3 — STACK.
-# Просто список юнитов, которые разворачиваются вместе: «отчётный пайплайн» =
-# сервисный аккаунт + топик с подписками, на которые этому аккаунту выданы права.
-# Своей логики тут нет. Значения юниты берут из project.hcl окружения.
+# LEVEL 3 — STACK.
+# Just a list of units deployed together: the "reporting pipeline" =
+# a service account + a topic with subscriptions that this account is granted access to.
+# No logic of its own. Units take their values from the environment's project.hcl.
 
 locals {
   catalog = "${dirname(find_in_parent_folders("root.hcl"))}/../catalog"

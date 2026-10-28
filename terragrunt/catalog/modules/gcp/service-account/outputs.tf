@@ -3,6 +3,6 @@ output "email" {
 }
 
 output "member" {
-  description = "Готовая строка для IAM-привязок"
+  description = "Ready-made member string for IAM bindings"
   value       = "serviceAccount:${google_service_account.this.email}"
 }

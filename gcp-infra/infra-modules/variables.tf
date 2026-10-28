@@ -1,10 +1,10 @@
 variable "env" {
-  description = "Окружение: dev, stage или prod. Добавляется в имена ресурсов. Задаётся в infra/<env>/env.hcl"
+  description = "Environment: dev, stage or prod. Added to resource names. Set in infra/<env>/env.hcl"
   type        = string
 
   validation {
     condition     = contains(["dev", "stage", "prod"], var.env)
-    error_message = "env должен быть dev, stage или prod."
+    error_message = "env must be dev, stage or prod."
   }
 }
 
@@ -20,9 +20,9 @@ variable "region" {
 
 variable "with_compute" {
   description = <<-EOT
-    Создавать ли Cloud Run сервис и Cloud SQL инстанс. Если floci запущен с *_MOCK=true —
-    появится только control plane (видно в floci-ui и API). Без mock floci попытается поднять
-    реальные контейнеры через Docker socket.
+    Whether to create the Cloud Run service and Cloud SQL instance. If floci runs with *_MOCK=true,
+    only the control plane appears (visible in floci-ui and the API). Without mock floci tries to start
+    real containers via the Docker socket.
   EOT
   type        = bool
   default     = true

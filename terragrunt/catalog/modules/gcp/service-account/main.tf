@@ -1,6 +1,6 @@
-# УРОВЕНЬ 1 — MODULE.
-# Обычный Terraform: «как создать сервисный аккаунт». Ничего не знает
-# ни про Terragrunt, ни про окружения — все значения приходят через variables.
+# LEVEL 1 — MODULE.
+# Plain Terraform: "how to create a service account". Knows nothing
+# about Terragrunt or environments — all values come in through variables.
 
 resource "google_service_account" "this" {
   account_id   = var.account_id

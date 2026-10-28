@@ -1,25 +1,25 @@
-# Общие настройки для всех юнитов в infra/**.
-# Всё, что касается floci, задаётся здесь. Переменные окружения не нужны.
+# Shared settings for all units under infra/**.
+# Everything floci-related is set here. No environment variables are needed.
 locals {
-  endpoint     = "http://localhost:4588" # адрес floci-gcp
-  project      = "floci-local"           # проект по умолчанию у floci, его же показывает floci-ui
+  endpoint     = "http://localhost:4588" # floci-gcp address
+  project      = "floci-local"           # floci's default project, also shown in floci-ui
   region       = "us-central1"
   state_bucket = "${local.project}-tfstate"
 
-  # Окружение берётся из infra/<env>/env.hcl. Сначала ищем рядом с terragrunt.hcl юнита
-  # (find_in_parent_folders эту папку пропускает), потом выше по дереву.
+  # The environment comes from infra/<env>/env.hcl. Look next to the unit's terragrunt.hcl first
+  # (find_in_parent_folders skips that folder), then further up the tree.
   env_file = fileexists("${get_terragrunt_dir()}/env.hcl") ? "${get_terragrunt_dir()}/env.hcl" : find_in_parent_folders("env.hcl")
   env      = read_terragrunt_config(local.env_file).locals.env
 
-  # Путь state внутри бакета: <env>/<юнит>/default.tfstate.
+  # State path inside the bucket: <env>/<unit>/default.tfstate.
   # infra/dev → dev, infra/dev/network → dev/network
   state_prefix = trimprefix(path_relative_to_include(), "infra/")
 }
 
-# ── Provider: google, каждый API перенаправлен на floci ──────────────────────
-# Список custom endpoints взят из floci-gcp/compatibility-tests/compat-terraform.
-# Firestore/Datastore/Tasks/Scheduler через Terraform не заводим: для них у floci нет
-# проверенного REST-пути под провайдер, их создаёт `python lab.py bootstrap`.
+# ── Provider: google, every API redirected to floci ─────────────────────────
+# The custom endpoints list is taken from floci-gcp/compatibility-tests/compat-terraform.
+# Firestore/Datastore/Tasks/Scheduler are not managed by Terraform: floci has no
+# tested REST path for them in the provider, `python lab.py bootstrap` creates them.
 generate "provider" {
   path      = "provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -28,7 +28,7 @@ provider "google" {
   project = "${local.project}"
   region  = "${local.region}"
 
-  access_token          = "mock-token" # floci токен не проверяет
+  access_token          = "mock-token" # floci does not validate the token
   user_project_override = false
 
   storage_custom_endpoint          = "${local.endpoint}/storage/v1/"
@@ -47,10 +47,10 @@ provider "google" {
 EOT
 }
 
-# ── Backend: state в GCS-бакете на floci ─────────────────────────────────────
-# Блок remote_state не используем: при создании бакета Terragrunt игнорирует
-# storage_custom_endpoint и идёт в настоящий storage.googleapis.com. Поэтому backend.tf
-# генерируем сами, а бакет создаёт before_hook ниже.
+# ── Backend: state in a GCS bucket on floci ──────────────────────────────────
+# remote_state is not used: when creating the bucket Terragrunt ignores
+# storage_custom_endpoint and calls the real storage.googleapis.com. So backend.tf
+# is generated here and the before_hook below creates the bucket.
 generate "backend" {
   path      = "backend.tf"
   if_exists = "overwrite_terragrunt"
@@ -67,7 +67,7 @@ EOT
 }
 
 terraform {
-  # Создаёт бакет для state перед init. Если бакет уже есть, floci вернёт 409, это норма.
+  # Creates the state bucket before init. If it already exists floci returns 409, which is fine.
   before_hook "ensure_state_bucket" {
     commands = ["init"]
     execute = [
@@ -79,7 +79,7 @@ terraform {
           '${local.endpoint}/storage/v1/b?project=${local.project}')
         case "$code" in
           200|409) ;;
-          *) echo "Не удалось создать бакет ${local.state_bucket} (HTTP $code). floci запущен?" >&2; exit 1 ;;
+          *) echo "Failed to create bucket ${local.state_bucket} (HTTP $code). Is floci running?" >&2; exit 1 ;;
         esac
       EOT
     ]

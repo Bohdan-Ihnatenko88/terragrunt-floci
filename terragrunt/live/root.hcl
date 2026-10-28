@@ -1,13 +1,13 @@
-# Корневой конфиг: то, что общее для ВСЕХ юнитов во всех окружениях.
-# Каждый юнит подключает его через include "root" { path = find_in_parent_folders("root.hcl") }.
+# Root config: what is shared by ALL units in all environments.
+# Each unit includes it via include "root" { path = find_in_parent_folders("root.hcl") }.
 
 locals {
   project_vars = read_terragrunt_config(find_in_parent_folders("project.hcl"))
   project      = local.project_vars.locals.project
 }
 
-# provider.tf генерируется в каждый юнит — тот же провайдер, что в terraform/providers.tf,
-# только значения берутся из project.hcl текущего окружения.
+# provider.tf is generated into every unit — the same provider as in terraform/providers.tf,
+# except the values come from the current environment's project.hcl.
 generate "provider" {
   path      = "provider.tf"
   if_exists = "overwrite_terragrunt"
@@ -37,8 +37,8 @@ generate "provider" {
   EOT
 }
 
-# State каждого юнита — отдельный файл. В настоящем проекте тут был бы GCS-бакет
-# (backend = "gcs"), здесь для простоты — локальная папка live/.state/.
+# Each unit's state is a separate file. A real project would use a GCS bucket here
+# (backend = "gcs"); for simplicity this uses the local folder live/.state/.
 remote_state {
   backend = "local"
   config = {

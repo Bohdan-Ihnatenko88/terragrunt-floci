@@ -3,7 +3,7 @@ variable "topic" {
 }
 
 variable "subscriptions" {
-  description = "Подписки на топик: имя => настройки"
+  description = "Subscriptions on the topic: name => settings"
   type = map(object({
     ack_deadline_seconds = optional(number, 30)
   }))
@@ -11,7 +11,7 @@ variable "subscriptions" {
 }
 
 variable "subscribers" {
-  description = "IAM-участники (serviceAccount:...), которым выдать roles/pubsub.subscriber"
+  description = "IAM members (serviceAccount:...) to grant roles/pubsub.subscriber"
   type        = list(string)
   default     = []
 }

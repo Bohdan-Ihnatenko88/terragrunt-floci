@@ -6,25 +6,25 @@ __pycache__/
 build/
 dist/
 
-# Виртуальные окружения
+# Virtual environments
 .venv/
 venv/
 
-# Кэши инструментов
+# Tool caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
 
-# Локальные переменные окружения
+# Local environment variables
 .env
 .env.*
 
-# Случайный state, если terraform запустили в этой папке
+# Stray state if terraform was run in this folder
 *.tfstate
 *.tfstate.*
 .terraform/
 
-# ОС
+# OS
 .DS_Store

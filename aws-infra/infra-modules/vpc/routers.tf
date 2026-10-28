@@ -1,4 +1,4 @@
-# Приватная таблица маршрутизации
+# Private route table
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
@@ -7,14 +7,14 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Маршрут для приватных подсетей через NAT Gateway
+# Route for private subnets via the NAT Gateway
 resource "aws_route" "private_nat" {
   route_table_id         = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.this.id
 }
 
-# Публичная таблица маршрутизации
+# Public route table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -23,7 +23,7 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Маршрут для публичных подсетей через Internet Gateway
+# Route for public subnets via the Internet Gateway
 resource "aws_route" "public_igw" {
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"

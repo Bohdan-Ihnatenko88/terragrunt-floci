@@ -17,9 +17,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-# Значения переменных часто содержат секреты
+# Variable values often contain secrets
 *.tfvars
 *.tfvars.json
 
-# ОС
+# OS
 .DS_Store

@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 6.68.0" # та же ветка, на которой гоняются compat-тесты floci-gcp
+      version = "~> 6.68.0" # same branch the floci-gcp compat tests run on
     }
   }
 }

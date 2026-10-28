@@ -1,5 +1,5 @@
 variable "account_id" {
-  description = "ID сервисного аккаунта (часть e-mail до @)"
+  description = "Service account ID (the part of the e-mail before @)"
   type        = string
 }
 

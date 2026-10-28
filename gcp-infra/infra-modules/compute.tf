@@ -1,8 +1,8 @@
-# «Тяжёлые» сервисы — только чтобы потрогать их через Terraform и увидеть в floci-ui.
-# Приложение от них не зависит. Выключить: terraform apply -var with_compute=false
+# "Heavy" services — only to try them via Terraform and see them in floci-ui.
+# The app does not depend on them. To disable: set with_compute = false in the unit's terragrunt.hcl
 #
-# В mock-режиме floci (CLOUDRUN_MOCK / CLOUDSQL_MOCK = true) создаётся только control plane.
-# Без mock floci сам поднимет nginx и Postgres как Docker-контейнеры.
+# In floci mock mode (CLOUDRUN_MOCK / CLOUDSQL_MOCK = true) only the control plane is created.
+# Without mock floci starts nginx and Postgres as Docker containers itself.
 
 resource "google_storage_bucket_object" "site_index" {
   count        = var.with_compute ? 1 : 0

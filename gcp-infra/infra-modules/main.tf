@@ -1,19 +1,19 @@
-# «Инфра-команда» проекта: всё, что в реальной жизни лежало бы в terraform-репо.
-# Приложение (app/) эти ресурсы только использует.
+# The project's "infra team" part: everything that in real life would live in a terraform repo.
+# The app (app/) only uses these resources.
 
 locals {
   labels = { app = "orders-lab", env = var.env }
 }
 
-# ── Сервисный аккаунт приложения ─────────────────────────────────────────────
+# ── App service account ──────────────────────────────────────────────────────
 resource "google_service_account" "worker" {
   account_id   = "${var.env}-orders-worker"
   display_name = "Orders pipeline worker (${var.env})"
 }
 
 # ── Cloud Storage ────────────────────────────────────────────────────────────
-# uploads   — сюда партнёры кладут CSV с заказами (incoming/...)
-# processed — сюда воркер переносит обработанные файлы
+# uploads   — partners drop order CSVs here (incoming/...)
+# processed — the worker moves processed files here
 resource "google_storage_bucket" "uploads" {
   name                        = "${var.project}-${var.env}-uploads"
   location                    = "US"
@@ -33,13 +33,13 @@ resource "google_storage_bucket" "processed" {
 resource "google_storage_bucket_object" "readme" {
   bucket       = google_storage_bucket.uploads.name
   name         = "README.txt"
-  content      = "Кладите CSV с заказами в incoming/ — воркер подхватит их через Pub/Sub."
+  content      = "Put order CSVs into incoming/ — the worker picks them up via Pub/Sub."
   content_type = "text/plain"
 }
 
 # ── Pub/Sub ──────────────────────────────────────────────────────────────────
-# uploads          ← события GCS (OBJECT_FINALIZE), нотификацию вешает `lab.py bootstrap`
-# report-requests  ← Cloud Scheduler раз в минуту
+# uploads          ← GCS events (OBJECT_FINALIZE), the notification is set up by `lab.py bootstrap`
+# report-requests  ← Cloud Scheduler once a minute
 resource "google_pubsub_topic" "uploads" {
   name   = "${var.env}-uploads"
   labels = local.labels
@@ -69,7 +69,7 @@ resource "google_pubsub_subscription_iam_member" "worker_uploads" {
 }
 
 # ── Secret Manager ───────────────────────────────────────────────────────────
-# «Ключ партнёрского API», которым воркер подписывает заказы (HMAC).
+# "Partner API key" the worker uses to sign orders (HMAC).
 resource "google_secret_manager_secret" "partner_api_key" {
   secret_id = "${var.env}-partner-api-key"
 
@@ -92,7 +92,7 @@ resource "google_secret_manager_secret_iam_member" "worker_reads_key" {
 }
 
 # ── Cloud KMS ────────────────────────────────────────────────────────────────
-# Шифруем e-mail клиентов перед записью в Firestore (PII не лежит в открытом виде).
+# Encrypt customer e-mails before writing to Firestore (no plaintext PII).
 resource "google_kms_key_ring" "orders" {
   name     = "${var.env}-orders"
   location = var.region
@@ -105,9 +105,9 @@ resource "google_kms_crypto_key" "pii" {
 }
 
 # ── BigQuery ─────────────────────────────────────────────────────────────────
-# Аналитика по заказам — без PII.
+# Order analytics — no PII.
 resource "google_bigquery_dataset" "orders" {
-  dataset_id                 = "${var.env}_orders" # в BigQuery допустимы только буквы, цифры и _
+  dataset_id                 = "${var.env}_orders" # BigQuery allows only letters, digits and _
   friendly_name              = "Orders analytics (${var.env})"
   location                   = "US"
   delete_contents_on_destroy = true

@@ -13,5 +13,5 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
-# ОС
+# OS
 .DS_Store
